@@ -255,8 +255,8 @@ def vali(model, vali_data, vali_loader, criterion, args, device, itr):
         model.eval()
     with torch.no_grad():
         for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in tqdm(enumerate(vali_loader)):
-            batch_x = batch_x.float().to(device)
-            batch_y = batch_y.float()
+            batch_x = batch_x.to(device)
+            batch_y = batch_y
             
             batch_x_mark = batch_x_mark.float().to(device)
             batch_y_mark = batch_y_mark.float().to(device)
@@ -434,44 +434,75 @@ def test(model, test_data, test_loader, args, device, itr):
     trues = []
     prevs = []
     model.eval()
+    label_encoders, cols, target = test_data.get_config()
+    target_encoders = label_encoders[-1]
+    
     with torch.no_grad():
         for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in tqdm(enumerate(test_loader)):
             
         
-            batch_x = batch_x.float().to(device)
-            batch_y = batch_y.float().to(device)
+            batch_x = batch_x.to(device)
+            batch_y = batch_y.to(device)
             
-            outputs = model(batch_x[:, -args.seq_len:, :])
+            outputs = model(batch_x)
+            print(outputs.shape)
             
             # encoder - decoder
-            outputs = outputs[:, -args.pred_len:, :]
-            batch_y = batch_y[:, -args.pred_len:, :].to(device)
+            outputs = outputs[:, -args.pred_len:]
+            batch, pred_len, output_embed_dim = outputs.shape
+            # shape is [batch, pred_len, output_embed_dim]
+            
+            # output is a softmax result of prediction legnth, for each prediction, sort them and get top 10 predictions
+            # want shape [batch, pred_len, 10] which is sorted top 10 predictions
+            outputs = torch.topk(outputs, 10, sorted=True).indices
+            assert outputs.shape == (batch, pred_len, 10)
+            
+            
+            batch_y = batch_y[:, -args.pred_len:]
+            batch_y = torch.topk(batch_y, 1, sorted=True).indices
+            batch_y = batch_y.squeeze(-1)
+            assert batch_y.shape == (batch, pred_len)
 
             pred = outputs.detach().cpu().numpy()
             true = batch_y.detach().cpu().numpy()
-            prev = batch_x[:, -args.seq_len:, :].cpu().numpy()
+            # prev = batch_x[:, -args.seq_len:].cpu().numpy()
             
             preds.append(pred)
             trues.append(true)
-            prevs.append(prev)
+            # prevs.append(prev)
 
     preds = np.array(preds)
     trues = np.array(trues)
-    prevs = np.array(prevs)
+    # prevs = np.array(prevs)
     
     # base_path = '/p/selfdrivingpj/projects_time/NeurIPS2023-One-Fits-All/Long-term_Forecasting/'
     # np.save(base_path+f'pre_res/preds_{itr}.npy' ,preds )
     # np.save(base_path+f'pre_res/trues_{itr}.npy' ,trues )
     # np.save(base_path+f'pre_res/prevs_{itr}.npy' ,prevs )
     
-    # mases = np.mean(np.array(mases))
-    print('test shape:', preds.shape, trues.shape)
-    preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
-    trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
-    print('test shape:', preds.shape, trues.shape)
-    
-    mae, mse, rmse, mape, mspe, smape, nd = metric(preds, trues)
-    # print('mae:{:.4f}, mse:{:.4f}, rmse:{:.4f}, smape:{:.4f}, mases:{:.4f}'.format(mae, mse, rmse, smape, mases))
-    print('mae:{:.4f}, mse:{:.4f}, rmse:{:.4f}, smape:{:.4f}'.format(mae, mse, rmse, smape))
+    # Print first 3 sample predictions and corresponding truths
+    print(f'Predictions: {preds[:3]}')
+    print(f'Truths: {trues[:3]}')
 
-    return mse, mae
+    # Calculate the total accuracy by comparing prediction and truth
+    topk = [10, 5, 3, 2, 1]
+    correct = {k: 0 for k in topk}
+    total = 0
+    for pred, true in zip(preds, trues):
+        assert pred.shape == (batch, pred_len, 10)
+        assert true.shape == (batch, pred_len)
+        
+        # Vectorized check if true is in top 10, 5, 3, 2, 1 predictions
+        total += batch * pred_len
+        for k in topk:
+            correct[k] += np.sum(np.any(np.expand_dims(true, axis=-1) == pred[:, :, :k], axis=-1))
+            
+    for k in topk:
+        accuracy = correct[k] / total
+        print(f"Top {k} accuracy: {accuracy}")
+        
+    # use the label encdoers to get the actual values
+    # trues = target_encoders.inverse_transform(trues)
+    # preds = target_encoders.inverse_transform(preds)
+
+    return accuracy

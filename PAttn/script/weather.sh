@@ -42,5 +42,10 @@ python main.py \
     --is_gpt 1 \
     --gpu_loc $gpu_loc \
     --save_file_name $filename
+# if there is an error, then exit
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+done
 done
 done

@@ -1,8 +1,8 @@
-from data_provider.data_factory import data_provider
+from data_provider.data_factory import data_provider, get_data_loader
 from utils.tools import EarlyStopping, adjust_learning_rate, visual, vali, test
 from tqdm import tqdm
 from models.PatchTST import PatchTST
-from models.PAttn import PAttn_lstm
+from models.PAttn import PAttn
 
 import numpy as np
 import torch
@@ -41,7 +41,7 @@ parser.add_argument('--embed', type=str, default='timeF')
 parser.add_argument('--percent', type=int, default=10)
 parser.add_argument('--all', type=int, default=0)
 
-parser.add_argument('--seq_len', type=int, default=512)
+parser.add_argument('--seq_len', type=int, default=96)
 parser.add_argument('--pred_len', type=int, default=96)
 parser.add_argument('--label_len', type=int, default=48)
 
@@ -112,9 +112,15 @@ SEASONALITY_MAP = {
    "quarterly": 4,
    "yearly": 1
 }
-mses = []
-maes = []
+
+accuracies = []
 print(args.model_id)
+
+train_data, vali_data, test_data = data_provider(args, 'test')
+label_encoders, cols, target = train_data.get_config()
+args.features = len(cols)
+args.label_encoders = label_encoders
+
 for ii in range(args.itr):
 
     setting = '{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_gl{}_df{}_eb{}_itr{}'.format(args.model_id, 336, args.label_len, args.pred_len,
@@ -123,28 +129,33 @@ for ii in range(args.itr):
     path = './checkpoints/' +  args.model_id + '_'+ str(ii)
     if not os.path.exists(path):
         os.makedirs(path)
+        
+    train_loader, vali_loader, test_loader = get_data_loader(train_data, vali_data, test_data, args, shuffle_flag=True, drop_last=True)
 
+    device = torch.device(device_address)
     if os.path.exists(path + '/' + 'checkpoint.pth'):
-        print(args.model_id , ' has done!!')
+        print(args.model_id , ' has done!!, run test right now')
+        
+        # load model
+        model = PAttn(args ,  device)
+        model.load_state_dict(torch.load(path + '/' + 'checkpoint.pth'))
+        model.to(device)
+        accuracy = test(model, test_data, test_loader, args, device, 114514)
         continue
         
     if args.freq == 0:
         args.freq = 'h'
         
-    train_data, train_loader = data_provider(args, 'train')
-    vali_data, vali_loader = data_provider(args, 'val')
-    test_data, test_loader = data_provider(args, 'test')
     
     if args.freq != 'h':
         args.freq = SEASONALITY_MAP[test_data.freq]
         print("freq = {}".format(args.freq))
-    device = torch.device(device_address)
 
     time_now = time.time()
     train_steps = len(train_loader)
 
     if args.model == 'PAttn':
-        model = PAttn_lstm(args ,  device )
+        model = PAttn(args ,  device )
         print(device)
         model.to(device)
 
@@ -162,10 +173,7 @@ for ii in range(args.itr):
                 return torch.mean(200 * torch.abs(pred - true) / (torch.abs(pred) + torch.abs(true) + 1e-8))
         criterion = SMAPE()
 
-    if 'l2loss' in args.model_id : 
-        criterion = nn.MSELoss()
-    else : 
-        criterion = nn.L1Loss()
+    criterion = nn.CrossEntropyLoss()
         
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(model_optim, T_max=args.tmax, eta_min=1e-8)
     is_first = True 
@@ -184,14 +192,15 @@ for ii in range(args.itr):
             iter_count += 1
             model_optim.zero_grad()
 
-            batch_x = batch_x.float().to(device)
+            batch_x = batch_x.to(device)
 
-            batch_y = batch_y.float().to(device)
+            batch_y = batch_y.to(device)
             batch_x_mark = batch_x_mark.float().to(device)
             batch_y_mark = batch_y_mark.float().to(device)
             outputs = model(batch_x)
             
             assert outputs.shape == batch_y.shape
+            # 1024, 13632 == 96, 142
             
             loss = criterion(outputs, batch_y)
             train_loss.append(loss.item())
@@ -226,19 +235,13 @@ for ii in range(args.itr):
     best_model_path = path + '/' + 'checkpoint.pth'
     model.load_state_dict(torch.load(best_model_path))
     print("------------------------------------")
-    mse, mae = test(model, test_data, test_loader, args, device, ii)
-    mses.append(round(mse,5))
-    maes.append(round(mae,5))
+    accuracy = test(model, test_data, test_loader, args, device, ii)
+    accuracies.append(accuracy)
 
-if len(maes)==0 : exit()
-maes = np.array(maes)
-mses = np.array(mses)
-print("mse_mean = {:.4f}, mse_std = {:.4f}".format(np.mean(mses), np.std(mses)))
-print("mae_mean = {:.4f}, mae_std = {:.4f}".format(np.mean(maes), np.std(maes)))
     
 with open(log_fine_name , 'a') as f : 
     f.write("{}\n".format(args.model_id))
-    f.write("mae:{:.4f}, std:{:.4f} ---- mse:{:.4f}, std:{:.4f}\n".format(np.mean(maes), np.std(maes) , np.mean(mses), np.std(mses)))
+    f.write("{}\n".format(accuracies))
         
 print(log_fine_name)
 

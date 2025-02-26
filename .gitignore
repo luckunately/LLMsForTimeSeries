@@ -1,0 +1,13 @@
+*.txt
+*.pth
+*.csv
+*.zip
+*.npz
+*.pth
+datasets
+*.log
+*.*pyc
+*.md
+*.*__pycache__/*
+/data1/tom/apps/LLMsForTimeSeries/PAttn_lstm/utils/__pycache__/tools.cpython-310.pyc
+

@@ -1,0 +1,8 @@
+Electricity_512_96_PAttn
+mae:0.1937, std:0.0000 ---- mse:0.1011, std:0.0000
+Electricity_512_192_PAttn
+mae:0.2066, std:0.0000 ---- mse:0.1070, std:0.0000
+Electricity_512_336_PAttn
+mae:0.2559, std:0.0000 ---- mse:0.1662, std:0.0000
+Electricity_512_720_PAttn
+mae:0.2876, std:0.0000 ---- mse:0.2038, std:0.0000
