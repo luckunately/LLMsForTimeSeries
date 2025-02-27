@@ -1,6 +1,6 @@
 export CUDA_VISIBLE_DEVICES="0,1,2"
 
-seq_len=512
+seq_len=32
 
 model=PAttn
 methods_h='PAttn'
@@ -9,7 +9,7 @@ tag_file=main.py
 gpu_loc=0
 percent=100
 
-pre_lens_h='96'
+pre_lens_h='16'
 # pre_lens_h='96 192 336 720'
 workload=mcf_50
 filename=$workload.txt

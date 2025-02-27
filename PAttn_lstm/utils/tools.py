@@ -501,8 +501,14 @@ def test(model, test_data, test_loader, args, device, itr):
         accuracy = correct[k] / total
         print(f"Top {k} accuracy: {accuracy}")
         
-    # use the label encdoers to get the actual values
-    # trues = target_encoders.inverse_transform(trues)
-    # preds = target_encoders.inverse_transform(preds)
+    with open('results.txt', 'w') as f:
+        f.write(f"predictions,truth\n")
+        for pred, true in zip(preds, trues):
+            # use target_encoders to convert back to original values
+            pred = np.array(pred)
+            for i in range(pred.shape[0]):
+                true[i] = target_encoders.inverse_transform(true[i])
+                pred[i] = [target_encoders.inverse_transform(pred[i][j]) for j in range(pred.shape[1])]
+                f.write(f"{pred[i]},{true[i]}\n")
 
     return accuracy

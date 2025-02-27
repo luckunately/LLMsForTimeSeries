@@ -6,7 +6,7 @@ from einops import rearrange
 from embed import DataEmbedding_wo_time_pos
 
 # from  models.Attention import MultiHeadAttention
-from torch.nn import MultiheadAttention
+from torch.nn import MultiheadAttention, LSTM
     
 class Encoder_LLaTA(nn.Module):
     def __init__(self, input_dim , hidden_dim=768, num_heads=12, num_encoder_layers=1):
@@ -71,11 +71,15 @@ class PAttn(nn.Module):
         self.features = configs.features
         self.label_encoders = configs.label_encoders
         assert len(self.label_encoders) == self.features + 1
-        self.embeddings = nn.ModuleList([torch.nn.Embedding(configs.seq_len, self.d_model) for le in (self.label_encoders)])
+        # self.embeddings = nn.ModuleList([torch.nn.Embedding(configs.seq_len, self.d_model) for le in (self.label_encoders)])
+        self.in_layer = nn.Linear(self.features * self.seq_len, self.d_model)
        
-        self.basic_attn = MultiheadAttention(embed_dim =self.d_model, num_heads=8)
+        # self.basic_attn = MultiheadAttention(embed_dim =self.d_model, num_heads=8)
+        self.lstm = LSTM(input_size=self.d_model, hidden_size=self.d_model, num_layers=2, batch_first=True)
+        
+        
         output_embed_dim = len(self.label_encoders[-1].classes_)
-        self.out_layer = nn.Linear(self.d_model * self.seq_len * self.features, configs.pred_len * output_embed_dim)
+        self.out_layer = nn.Linear(self.d_model, configs.pred_len * output_embed_dim)
         
         # softmax for each pred_len
         self.softmax = nn.Softmax(dim=2)
@@ -83,10 +87,13 @@ class PAttn(nn.Module):
     def forward(self, x):
         batch, features, seq_len = x.size()
         # embed the data
-        x = torch.cat([self.embeddings[i](x[:, i, :]) for i in range(features)], dim=1)
+        # x = torch.cat([self.embeddings[i](x[:, i, :]) for i in range(features)], dim=1)
+        x = x.flatten(start_dim=1).float()
+        x = self.in_layer(x)
         # now shape is [batch, features * history, d_model]
 
-        x, _ = self.basic_attn( x ,x ,x )
+        # x, _ = self.basic_attn( x ,x ,x )
+        x, _ = self.lstm(x)
         # flatten the data, but keep the batch dimension
         x = x.flatten(start_dim=1)
         

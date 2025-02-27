@@ -427,7 +427,7 @@ class Dataset_page_fault(Dataset):
         # For classification, you might want to use LabelEncoder for the target variable
         df_raw = pd.read_csv(os.path.join(self.root_path,
                                           self.data_path)
-                             ,nrows=10000
+                             ,nrows=100000
                              )
         
         cols = list(df_raw.columns)
@@ -443,7 +443,10 @@ class Dataset_page_fault(Dataset):
         self.label_encoders[-1].fit(target_col)
         print(f'Number of unique target values {target_col}: {len(self.label_encoders[-1].classes_)}')
         target_col = self.label_encoders[-1].transform(target_col)
-        self.data_y = torch.nn.functional.one_hot(torch.tensor(target_col), num_classes=len(self.label_encoders[-1].classes_)).numpy()
+        # self.data_y = torch.nn.functional.one_hot(torch.tensor(target_col), num_classes=len(self.label_encoders[-1].classes_)).numpy()
+        # Efficient one-hot encoding using NumPy's advanced indexing
+        self.data_y = np.eye(len(self.label_encoders[-1].classes_))[target_col]
+        
         df_raw = df_raw.drop([self.target], axis=1)
         self.cols = cols
         

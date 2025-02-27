@@ -140,7 +140,9 @@ for ii in range(args.itr):
         model = PAttn(args ,  device)
         model.load_state_dict(torch.load(path + '/' + 'checkpoint.pth'))
         model.to(device)
-        accuracy = test(model, test_data, test_loader, args, device, 114514)
+        # accuracy = test(model, test_data, test_loader, args, device, 114514)
+        accuracy = test(model, train_data, train_loader, args, device, 114514)
+        
         continue
         
     if args.freq == 0:
