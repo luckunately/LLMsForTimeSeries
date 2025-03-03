@@ -124,16 +124,18 @@ class PAttn(nn.Module):
         # since classification, need to embed the data
         self.features = configs.features
         self.label_encoders = configs.label_encoders
+        self.padding_patch_layer = nn.ReplicationPad1d((0,  self.stride)) 
+        
         assert len(self.label_encoders) == self.features + 1
         # self.embeddings = nn.ModuleList([torch.nn.Embedding(configs.seq_len, self.d_model) for le in (self.label_encoders)])
         self.in_layer = nn.Linear(self.features * self.seq_len, self.d_model)
        
-        self.basic_attn = MultiheadAttention(embed_dim =self.d_model, num_heads=8)
-        # self.lstm = LSTM(input_size=self.d_model, hidden_size=self.d_model, num_layers=2, batch_first=True)
+        # self.basic_attn = MultiheadAttention(embed_dim =self.d_model, num_heads=8)
+        self.lstm = LSTM(input_size=self.d_model, hidden_size=self.d_model, num_layers=2, batch_first=True)
         
         
         output_embed_dim = len(self.label_encoders[-1].classes_)
-        self.out_layer = nn.Linear(self.d_model, configs.pred_len * output_embed_dim)
+        self.out_layer = nn.Linear(self.d_model * self.features, configs.pred_len * output_embed_dim)
         
         # softmax for each pred_len
         self.softmax = nn.Softmax(dim=2)
@@ -141,13 +143,20 @@ class PAttn(nn.Module):
     def forward(self, x):
         batch, features, seq_len = x.size()
         # embed the data
-        # x = torch.cat([self.embeddings[i](x[:, i, :]) for i in range(features)], dim=1)
-        x = x.flatten(start_dim=1).float()
-        x = self.in_layer(x)
+        x , means, stdev  = self.norm(x , dim=2)
+        x = self.padding_patch_layer(x)
+        # [Batch, Channel, 12, 16]
+        x = x.unfold(dimension=-1, size=self.patch_size, step=self.stride)
+        # [Batch, Channel, 4, 16]-> [Batch, Channel, 64]
+        x = rearrange(x, 'b c m l -> b c (m l)')
+        
+        # x = self.in_layer(x)
+        x = self.in_layer(x.to(self.in_layer.weight.dtype))
+        
         # now shape is [batch, features * history, d_model]
 
-        x, _ = self.basic_attn( x ,x ,x )
-        # x, _ = self.lstm(x)
+        # x, _ = self.basic_attn( x ,x ,x )
+        x, _ = self.lstm(x)
         # flatten the data, but keep the batch dimension
         x = x.flatten(start_dim=1)
         
@@ -213,7 +222,7 @@ class PAttn(nn.Module):
 #             # [Batch, Channel, 12, 16]
 #             x = x.unfold(dimension=-1, size=self.patch_size, step=self.stride)
 #             # [Batch, Channel, 12, 768]
-#             x = self.in_layer(x)
+#             x = self.in_layer(x.to(self.in_layer.weight.dtype))
 #             x =  rearrange(x, 'b c m l -> (b c) m l')
 #             x , _ = self.basic_attn( x ,x ,x )
 #             x =  rearrange(x, '(b c) m l -> b c (m l)' , b=B , c=C)
