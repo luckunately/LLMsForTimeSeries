@@ -263,11 +263,6 @@ def vali(model, vali_data, vali_loader, criterion, args, device, itr):
 
             outputs = model(batch_x)
             
-            
-            # sum up along pred_len, end with [batch, output_embed_dim]
-            outputs = torch.sum(outputs, dim=1)
-            batch_y = torch.sum(batch_y, dim=1)
-            
             pred = outputs.detach().cpu()
             true = batch_y.detach().cpu()
 
@@ -450,21 +445,13 @@ def test(model, test_data, test_loader, args, device, itr):
             batch_y = batch_y.to(device)
             
             outputs = model(batch_x)
-            
             # encoder - decoder
             outputs = outputs[:, -args.pred_len:]
-            batch, pred_len, output_embed_dim = outputs.shape
-            # shape is [batch, pred_len, output_embed_dim]
-            
-            # output is a softmax result of prediction legnth, for each prediction, sort them and get top 10 predictions
-            # want shape [batch, pred_len, 10] which is sorted top 10 predictions
-            outputs = torch.topk(outputs, 10, sorted=True).indices
-            assert outputs.shape == (batch, pred_len, 10)
+            batch, pred_len = outputs.shape
+
             
             
             batch_y = batch_y[:, -args.pred_len:]
-            batch_y = torch.topk(batch_y, 1, sorted=True).indices
-            batch_y = batch_y.squeeze(-1)
             assert batch_y.shape == (batch, pred_len)
 
             pred = outputs.detach().cpu().numpy()
@@ -489,30 +476,14 @@ def test(model, test_data, test_loader, args, device, itr):
     print(f'Truths: {trues[:3]}')
 
     # Calculate the total accuracy by comparing prediction and truth
-    topk = [10, 5, 3, 2, 1]
-    correct = {k: 0 for k in topk}
-    total = 0
-    for pred, true in zip(preds, trues):
-        assert pred.shape == (batch, pred_len, 10)
-        assert true.shape == (batch, pred_len)
-        
-        # Vectorized check if true is in top 10, 5, 3, 2, 1 predictions
-        total += batch * pred_len
-        for k in topk:
-            correct[k] += np.sum(np.any(np.expand_dims(true, axis=-1) == pred[:, :, :k], axis=-1))
-            
-    for k in topk:
-        accuracy = correct[k] / total
-        print(f"Top {k} accuracy: {accuracy}")
-        
+    accuracy = np.mean(np.abs(preds - trues))
+    
     with open('results.txt', 'w') as f:
         f.write(f"predictions,truth\n")
         for pred, true in zip(preds, trues):
             # use target_encoders to convert back to original values
             pred = np.array(pred)
             for i in range(pred.shape[0]):
-                true[i] = target_encoders.inverse_transform(true[i])
-                pred[i] = [target_encoders.inverse_transform(pred[i][j]) for j in range(pred.shape[1])]
-                f.write(f"{pred[i]},{true[i]}\n")
+                f.write(f"{np.round(pred[i])},{np.round(true[i])}\n")
 
     return accuracy

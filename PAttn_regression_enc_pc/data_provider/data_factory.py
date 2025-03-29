@@ -1,4 +1,4 @@
-from data_provider.data_loader import   Dataset_Custom,  Dataset_ETT_hour, Dataset_ETT_minute, Dataset_page_fault
+from data_provider.data_loader import   *
 from torch.utils.data import DataLoader
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import Dataset
@@ -6,6 +6,7 @@ import pandas as pd
 import torch, os
 
 from copy import deepcopy
+
 data_dict = {
     'custom': Dataset_Custom,
     'ett_h': Dataset_ETT_hour,

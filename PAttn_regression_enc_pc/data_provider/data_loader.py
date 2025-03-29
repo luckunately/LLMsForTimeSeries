@@ -431,10 +431,6 @@ class Dataset_page_fault(Dataset):
                              )
         
         cols = list(df_raw.columns)
-        if 'date' in cols:
-            # remove the date column for df_raw
-            cols.remove('date')
-        df_raw = df_raw[cols]
         
         # for each column, we need an encoder
         self.label_encoders = [LabelEncoder() for _ in cols]
@@ -443,26 +439,24 @@ class Dataset_page_fault(Dataset):
         # for each column, fit the encoder
         
         # get target first, then drop it    
-        target_col = df_raw[self.target].values
-        self.label_encoders[-1].fit(target_col)
-        print(f'Number of unique target values {target_col}: {len(self.label_encoders[-1].classes_)}')
-        target_col = self.label_encoders[-1].transform(target_col)
-        # self.data_y = torch.nn.functional.one_hot(torch.tensor(target_col), num_classes=len(self.label_encoders[-1].classes_)).numpy()
-        # Efficient one-hot encoding using NumPy's advanced indexing
+        # target_col = df_raw[self.target].values
+        # self.label_encoders[-1].fit(target_col)
+        # print(f'Number of unique target values {target_col}: {len(self.label_encoders[-1].classes_)}')
+        # target_col = self.label_encoders[-1].transform(target_col)
         # self.data_y = np.eye(len(self.label_encoders[-1].classes_))[target_col]
-        self.data_y = target_col
         
-        df_raw = df_raw.drop([self.target], axis=1)
+        # encode df_raw['pc'] with label encoder
+        df_raw['pc'] = self.label_encoders[0].fit_transform(df_raw['pc'])
+        
+        self.data_y = df_raw[self.target].values.astype(float)
+        df_raw = df_raw.drop(self.target, axis=1)
+        
+        cols_we_have = ['pc', 'delta_in']
+        df_raw['pc'] = df_raw['pc'].astype(float)
+        df_raw['delta_in'] = df_raw['delta_in'].astype(float)
+        
+        self.data_x = [df_raw[col].values for col in cols]
         self.cols = cols
-        
-        # for each column, fit the encoder
-        for i, col in enumerate(cols):
-            self.label_encoders[i].fit(df_raw[col].values)
-            df_raw[col] = self.label_encoders[i].transform(df_raw[col].values)
-            print(f'Number of unique values in {col}: {len(self.label_encoders[i].classes_)}')
-            # assert len(self.data_y) == len(df_raw[col].values)
-            
-        self.data_x = [df_raw[col].values for col in df_raw.columns]
     
     def get_config(self):
         return self.label_encoders, self.cols, self.target
@@ -510,10 +504,8 @@ class Dataset_page_fault(Dataset):
         seq_y = self.data_y[r_begin:r_end]
         seq_x_mark = self.data_stamp[s_begin:s_end]
         seq_y_mark = self.data_stamp[r_begin:r_end]
-        seq_y_mark = np.eye(len(self.label_encoders[-1].classes_))[seq_y]
         x = torch.tensor(seq_x) #.transpose(1, 0)  # [c, feature_index, seq_len]
-        y = torch.tensor(np.eye(len(self.label_encoders[-1].classes_))[seq_y])
-        # y = torch.tensor(seq_y, dtype=torch.float) #.transpose(1, 0)  # [c, pred_len]
+        y = torch.tensor(seq_y, dtype=torch.float) #.transpose(1, 0)  # [c, pred_len]
         return x , y ,  seq_x_mark, seq_y_mark
 
     def __len__(self):

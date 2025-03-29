@@ -1,6 +1,6 @@
 export CUDA_VISIBLE_DEVICES="0,1,2"
 
-seq_len=32
+seq_len=512
 
 model=PAttn
 methods_h='PAttn'
@@ -9,25 +9,21 @@ tag_file=main.py
 gpu_loc=0
 percent=100
 
-pre_lens_h='1'
-# pre_lens_h='96 192 336 720'
-workload=simple
-filename=$workload.txt
+pre_lens_h='96 192 336 720'
+filename=Electricity.txt
 
 for pred_len in $pre_lens_h;
 do
 for method in $methods_h;
 do
-lr=0.01
-bs=1
+lr=0.00005
+bs=16
 
-# python $tag_file \
-python -m debugpy --listen 5678 --wait-for-client $tag_file \
-    --root_path ./datasets/$workload/ \
-    --data_path $workload.csv \
-    --model_id $workload'_'$seq_len'_'$pred_len'_'$method \
-    --data page_fault \
-    --target delta_out \
+python $tag_file \
+    --root_path ./datasets/electricity/ \
+    --data_path electricity.csv \
+    --model_id 'Electricity_'$seq_len'_'$pred_len'_'$method \
+    --data custom \
     --method $method \
     --seq_len $seq_len \
     --label_len 0 \
@@ -36,9 +32,9 @@ python -m debugpy --listen 5678 --wait-for-client $tag_file \
     --learning_rate $lr \
     --train_epochs 10 \
     --decay_fac 0.75 \
-    --d_model 256 \
+    --d_model 768 \
     --n_heads 4 \
-    --d_ff 256 \
+    --d_ff 768 \
     --dropout 0.3 \
     --enc_in 7 \
     --c_out 7 \

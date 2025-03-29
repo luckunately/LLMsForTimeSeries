@@ -130,7 +130,7 @@ for ii in range(args.itr):
     if not os.path.exists(path):
         os.makedirs(path)
         
-    train_loader, vali_loader, test_loader = get_data_loader(train_data, vali_data, test_data, args, shuffle_flag=True, drop_last=True)
+    train_loader, vali_loader, test_loader = get_data_loader(train_data, vali_data, test_data, args, shuffle_flag=False, drop_last=True)
 
     device = torch.device(device_address)
     if os.path.exists(path + '/' + 'checkpoint.pth'):
@@ -175,7 +175,10 @@ for ii in range(args.itr):
                 return torch.mean(200 * torch.abs(pred - true) / (torch.abs(pred) + torch.abs(true) + 1e-8))
         criterion = SMAPE()
 
-    criterion = nn.CrossEntropyLoss()
+    if 'l2loss' in args.model_id : 
+        criterion = nn.MSELoss()
+    else : 
+        criterion = nn.L1Loss()
         
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(model_optim, T_max=args.tmax, eta_min=1e-8)
     is_first = True 
@@ -201,12 +204,8 @@ for ii in range(args.itr):
             batch_y_mark = batch_y_mark.float().to(device)
             outputs = model(batch_x)
             
-            assert outputs.shape == batch_y.shape
-            # should be both [batch, pred_len, output_embed_dim]
-            
-            # sum them up along the pred_len dimension to becom [batch, output_embed_dim]
-            outputs = outputs.sum(dim=1)
-            batch_y = batch_y.sum(dim=1)
+            # assert outputs.shape == batch_y.shape
+            # 1024, 13632 == 96, 142
             
             loss = criterion(outputs, batch_y)
             train_loss.append(loss.item())

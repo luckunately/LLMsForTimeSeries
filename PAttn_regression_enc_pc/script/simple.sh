@@ -9,7 +9,7 @@ tag_file=main.py
 gpu_loc=0
 percent=100
 
-pre_lens_h='1'
+pre_lens_h='16'
 # pre_lens_h='96 192 336 720'
 workload=simple
 filename=$workload.txt
@@ -18,8 +18,8 @@ for pred_len in $pre_lens_h;
 do
 for method in $methods_h;
 do
-lr=0.01
-bs=1
+lr=0.00005
+bs=16
 
 # python $tag_file \
 python -m debugpy --listen 5678 --wait-for-client $tag_file \

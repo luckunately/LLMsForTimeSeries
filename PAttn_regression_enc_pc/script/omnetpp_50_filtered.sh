@@ -11,18 +11,18 @@ percent=100
 
 pre_lens_h='1'
 # pre_lens_h='96 192 336 720'
-workload=simple
+workload=omnetpp_50_filtered
 filename=$workload.txt
 
 for pred_len in $pre_lens_h;
 do
 for method in $methods_h;
 do
-lr=0.01
-bs=1
+lr=0.001
+bs=64
 
-# python $tag_file \
-python -m debugpy --listen 5678 --wait-for-client $tag_file \
+# python -m debugpy --listen 5678 --wait-for-client $tag_file \
+python $tag_file \
     --root_path ./datasets/$workload/ \
     --data_path $workload.csv \
     --model_id $workload'_'$seq_len'_'$pred_len'_'$method \
